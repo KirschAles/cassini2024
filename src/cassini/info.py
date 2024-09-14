@@ -4,7 +4,7 @@ from typing import Any
 from shapely import Polygon
 import math
 import datetime
-import pandas
+import pandas as pd
 
 CATALOGUE = "https://catalogue.dataspace.copernicus.eu/stac"
 
@@ -52,8 +52,8 @@ def contains_bbox(bbox, geometry):
     return geometry.contains(bbox)
 
 def not_too_long(x):
-    start = x['properties']['start_datetime']
-    end = x['properties']['end_datetime']
+    start = x['properties']['start_datetime'][:19]
+    end = x['properties']['end_datetime'][:19]
     start = datetime.datetime.fromisoformat(start)
     end = datetime.datetime.fromisoformat(end)
     return end - start < datetime.timedelta(hours=1)
@@ -62,12 +62,12 @@ def get_new_updates(latitude: float,
                     longitude: float,
                     time_from: datetime.datetime,
                     collection: str = "SENTINEL-5P",
-                    width: float | int = 10):
+                    width: float = 10.):
     box = create_bounding_box(latitude, longitude, width)
     items = list_items(collection, bbox=[box[0], box[2]], datetime_from=time_from)
     items = [x for x in items if not_too_long(x)]
-    [x for x in items if contains_bbox(box, x['geometry']['coordinates'][0])]
-    datetimes = pd.DataFrame(data={'datetime': [datetime.datetime.fromisoformat(x['properties']['datetime']) for x in items]})
+    items = [x for x in items if contains_bbox(box, x['geometry']['coordinates'][0])]
+    datetimes = pd.DataFrame(data={'datetime': [datetime.datetime.fromisoformat(x['properties']['datetime'][:19]) for x in items]})
     datetimes['date'] = datetimes['datetime'].dt.date
     return list(datetimes.groupby(by=['date']).mean()['datetime'])
 
