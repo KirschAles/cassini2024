@@ -1,1 +1,1 @@
-web: gunicorn create_dashboard:server
+web: gunicorn src/cassini/create_dashboard:server
