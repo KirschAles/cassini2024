@@ -1,4 +1,5 @@
 import datetime
+import os
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as md
@@ -21,34 +22,38 @@ def create_dashboard(sat_data_dir):
     app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
     app.layout = html.Div([
-        html.H1("IoT Sensor and Satellite Data Dashboard"),
-        dbc.Row([
-            dbc.Col(dbc.Button("Overview", id="btn-overview", color="primary", className="m-1"), width="auto"),
-            dbc.Col(dbc.Button("Temperature", id="btn-temperature", color="secondary", className="m-1"), width="auto"),
-            dbc.Col(dbc.Button("Humidity", id="btn-humidity", color="secondary", className="m-1"), width="auto"),
-            dbc.Col(dbc.Button("Pressure", id="btn-pressure", color="secondary", className="m-1"), width="auto"),
-            dbc.Col(dbc.Button("Rainfall", id="btn-rainfall", color="secondary", className="m-1"), width="auto"),
-            dbc.Col(dbc.Button("CO Level (Satellite)", id="btn-satellite", color="secondary", className="m-1"), width="auto"),
-        ]),
-        dcc.Graph(id="graph-content", style={"height": "80vh"})
-    ])
+        dbc.Container([
+            html.H1("IoT Sensor and Satellite Data Dashboard", className="my-4"),
+            dbc.Row([
+                dbc.Col(dbc.Button("Overview", id="btn-overview", color="primary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("Temperature", id="btn-temperature", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("Humidity", id="btn-humidity", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("Pressure", id="btn-pressure", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("Rainfall", id="btn-rainfall", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("CO2 Level", id="btn-co2", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("CO Level (Satellite)", id="btn-satellite", color="secondary", className="m-1"), width="auto"),
+            ], className="mb-4"),
+            dcc.Graph(id="graph-content", style={"height": "80vh"})
+        ], fluid=True, className="px-4 py-3")
+    ], style={"backgroundColor": "#f8f9fa"})
 
     # Add this new component to your layout
-    app.layout.children.append(dcc.Interval(
+    app.layout.children[0].children.append(dcc.Interval(
         id='interval-component',
         interval=20*60*1000,  # in milliseconds, 20 minutes
         n_intervals=0
     ))
 
     def get_updated_data():
-        time_coarse, time_fine, temperature, humidity, pressure, rainfall = iot_time_series()
+        time_coarse, time_fine, time_co2, temperature, humidity, pressure, rainfall, co2 = iot_time_series()
         t, co_val = sat_time_series(sat_data_dir)
         
         dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
         dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
+        dates_co2 = [datetime.datetime.fromtimestamp(ts) for ts in time_co2]
         dates_sat = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
         
-        return dates_fine, dates_coarse, dates_sat, temperature, humidity, pressure, rainfall, co_val
+        return dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val
 
     @app.callback(
         Output("graph-content", "figure"),
@@ -57,8 +62,9 @@ def create_dashboard(sat_data_dir):
          Input("btn-humidity", "n_clicks"),
          Input("btn-pressure", "n_clicks"),
          Input("btn-rainfall", "n_clicks"),
+         Input("btn-co2", "n_clicks"),
          Input("btn-satellite", "n_clicks"),
-         Input("interval-component", "n_intervals")]  # Add this new input
+         Input("interval-component", "n_intervals")]
     )
     def update_graph(*args):
         ctx = dash.callback_context
@@ -68,23 +74,24 @@ def create_dashboard(sat_data_dir):
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         # Get updated data
-        dates_fine, dates_coarse, dates_sat, temperature, humidity, pressure, rainfall, co_val = get_updated_data()
+        dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val = get_updated_data()
 
         if button_id == "btn-overview":
-            fig = make_subplots(rows=3, cols=2, subplot_titles=("Temperature", "Humidity", "Pressure", "Rainfall", "Satellite Data"))
+            fig = make_subplots(rows=3, cols=2, subplot_titles=("Temperature", "Humidity", "Pressure", "Rainfall", "CO2 Level", "CO Level (Satellite)"))
             fig.add_trace(go.Scatter(x=dates_coarse, y=temperature, name="Temperature"), row=1, col=1)
             fig.add_trace(go.Scatter(x=dates_fine, y=humidity, name="Humidity"), row=1, col=2)
             fig.add_trace(go.Scatter(x=dates_fine, y=pressure, name="Pressure"), row=2, col=1)
             fig.add_trace(go.Scatter(x=dates_fine, y=rainfall, name="Rainfall"), row=2, col=2)
-            fig.add_trace(go.Scatter(x=dates_sat, y=co_val, name="Satellite Data"), row=3, col=1)
-            fig.update_xaxes(title_text="Time", row=2, col=1)
-            fig.update_xaxes(title_text="Time", row=2, col=2)
+            fig.add_trace(go.Scatter(x=dates_co2, y=co2, name="CO2 Level"), row=3, col=1)
+            fig.add_trace(go.Scatter(x=dates_sat, y=co_val, name="CO Level (Satellite)"), row=3, col=2)
             fig.update_xaxes(title_text="Time", row=3, col=1)
+            fig.update_xaxes(title_text="Time", row=3, col=2)
             fig.update_yaxes(title_text="Temperature [°C]", row=1, col=1)
             fig.update_yaxes(title_text="Humidity [%]", row=1, col=2)
             fig.update_yaxes(title_text="Pressure [hPa]", row=2, col=1)
             fig.update_yaxes(title_text="Rainfall [mm]", row=2, col=2)
-            fig.update_yaxes(title_text="CO Level", row=3, col=1)
+            fig.update_yaxes(title_text="CO2 Level [ppm]", row=3, col=1)
+            fig.update_yaxes(title_text="CO Level", row=3, col=2)
         elif button_id == "btn-temperature":
             fig = go.Figure(go.Scatter(x=dates_coarse, y=temperature, name="Temperature"))
             fig.update_layout(title="Temperature", xaxis_title="Time", yaxis_title="Temperature [°C]")
@@ -97,6 +104,9 @@ def create_dashboard(sat_data_dir):
         elif button_id == "btn-rainfall":
             fig = go.Figure(go.Scatter(x=dates_fine, y=rainfall, name="Rainfall"))
             fig.update_layout(title="Rainfall", xaxis_title="Time", yaxis_title="Rainfall [mm]")
+        elif button_id == "btn-co2":
+            fig = go.Figure(go.Scatter(x=dates_co2, y=co2, name="CO2 Level"))
+            fig.update_layout(title="CO2 Level", xaxis_title="Time", yaxis_title="CO2 Level [ppm]")
         elif button_id == "btn-satellite":
             fig = go.Figure(go.Scatter(x=dates_sat, y=co_val, name="CO Level (Satellite)"))
             fig.update_layout(title="Satellite Data", xaxis_title="Time", yaxis_title="CO Level")
@@ -158,4 +168,5 @@ def visualize_IOT_data():
 
 if __name__ == "__main__":
     app = create_dashboard(SAT_DATA_DIR)
-    app.run_server(debug=True)
+    server = app.server
+    app.run_server(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

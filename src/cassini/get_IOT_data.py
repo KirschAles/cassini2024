@@ -1,6 +1,7 @@
 import requests
 import ast
 import datetime
+import json
 
 
 def get_IOT_data():
@@ -26,10 +27,13 @@ def get_time_series():
     data = get_IOT_data()
     time_coarse = []
     time_fine = []
+    time_co2 = []
     temperature = []
     humidity = []
     pressure = []
     rainfall = []
+    co2 = []
+
     for t, d in enumerate(data):
         dtime_coarse = datetime.datetime.fromisoformat(d['created_at'][:19])
         tstamp_coarse = datetime.datetime.timestamp(dtime_coarse)
@@ -59,23 +63,31 @@ def get_time_series():
                 humidity.append(dict_data['hygrometer']['humidity']['measurements'][i]['avg'])
 
         
-        if d['device_name'] == 'chester-clime-iaq':
-            print(d.keys())
-
+        if d['type'] == 'data' and d['device_name'] == 'chester-clime-iaq':
             try:
-                dict_data = ast.literal_eval(d['body'])
+                dict_data = json.loads(d['body'])
             except Exception as e:
                 print("HAYAAAaaa")
                 print(e)
                 continue
+        
+            num_measurements = len(dict_data['iaq_sensor']['co2_conc']['measurements'])
+            # print(dict_data['iaq_sensor']['co2_conc']['measurements'])
+            for i in range(num_measurements):
+                time_co2.append(dict_data['iaq_sensor']['co2_conc']['measurements'][i]['timestamp'])
+                co2.append(dict_data['iaq_sensor']['co2_conc']['measurements'][i]['avg'])
 
-            print(dict_data.keys())
 
     
     sorted_rainfall = [r for _, r in sorted(zip(time_fine, rainfall))]
     sorted_pressure = [p for _, p in sorted(zip(time_fine, pressure))]
     sorted_humidity = [h for _, h in sorted(zip(time_fine, humidity))]
     sorted_time_fine = sorted(time_fine)
+    sorted_co2 = [c for _, c in sorted(zip(time_co2, co2))]
+    sorted_time_co2 = sorted(time_co2)
 
-    return time_coarse, sorted_time_fine, temperature, sorted_humidity, sorted_pressure, sorted_rainfall
+    return time_coarse, sorted_time_fine, sorted_time_co2, temperature, sorted_humidity, sorted_pressure, sorted_rainfall, sorted_co2
 
+
+if __name__ == "__main__":
+    time_coarse, time_fine, time_co2, temperature, humidity, pressure, rainfall, co2 = get_time_series()
