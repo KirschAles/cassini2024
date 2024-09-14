@@ -18,13 +18,6 @@ SAT_DATA_DIR = "output"
 
 
 def create_dashboard(sat_data_dir):
-    time_coarse, time_fine, temperature, humidity, pressure, rainfall = iot_time_series()
-    t, co_val = sat_time_series(sat_data_dir)
-
-    dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
-    dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
-    dates_sat = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
-
     app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
     app.layout = html.Div([
@@ -40,6 +33,23 @@ def create_dashboard(sat_data_dir):
         dcc.Graph(id="graph-content", style={"height": "80vh"})
     ])
 
+    # Add this new component to your layout
+    app.layout.children.append(dcc.Interval(
+        id='interval-component',
+        interval=20*60*1000,  # in milliseconds, 20 minutes
+        n_intervals=0
+    ))
+
+    def get_updated_data():
+        time_coarse, time_fine, temperature, humidity, pressure, rainfall = iot_time_series()
+        t, co_val = sat_time_series(sat_data_dir)
+        
+        dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
+        dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
+        dates_sat = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
+        
+        return dates_fine, dates_coarse, dates_sat, temperature, humidity, pressure, rainfall, co_val
+
     @app.callback(
         Output("graph-content", "figure"),
         [Input("btn-overview", "n_clicks"),
@@ -47,7 +57,8 @@ def create_dashboard(sat_data_dir):
          Input("btn-humidity", "n_clicks"),
          Input("btn-pressure", "n_clicks"),
          Input("btn-rainfall", "n_clicks"),
-         Input("btn-satellite", "n_clicks")]
+         Input("btn-satellite", "n_clicks"),
+         Input("interval-component", "n_intervals")]  # Add this new input
     )
     def update_graph(*args):
         ctx = dash.callback_context
@@ -55,6 +66,9 @@ def create_dashboard(sat_data_dir):
             button_id = "btn-overview"
         else:
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        # Get updated data
+        dates_fine, dates_coarse, dates_sat, temperature, humidity, pressure, rainfall, co_val = get_updated_data()
 
         if button_id == "btn-overview":
             fig = make_subplots(rows=3, cols=2, subplot_titles=("Temperature", "Humidity", "Pressure", "Rainfall", "Satellite Data"))
