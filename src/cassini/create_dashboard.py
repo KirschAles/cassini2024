@@ -11,8 +11,8 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from get_iot_data import get_time_series as iot_time_series
-from open_tif import get_time_series as sat_time_series
+from src.cassini.get_iot_data import get_time_series as iot_time_series
+from src.cassini.open_tif import get_time_series as sat_time_series
 
 
 SAT_DATA_DIR = "output"
@@ -166,7 +166,7 @@ def visualize_IOT_data():
 
 
 
-if __name__ == "__main__":
-    app = create_dashboard(SAT_DATA_DIR)
-    server = app.server
-    app.run_server(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+
+app = create_dashboard(SAT_DATA_DIR)
+server = app.server
+app.run_server(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))

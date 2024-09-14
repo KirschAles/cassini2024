@@ -23,6 +23,7 @@ fonttools==4.53.1
 geographiclib==2.0
 geopy==2.4.1
 georaster==1.25
+gunicorn==23.0.0
 idna==3.8
 importlib_metadata==8.5.0
 importlib_resources==6.4.5
