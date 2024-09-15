@@ -37,7 +37,7 @@ def create_dashboard(sat_data_dir):
         ], fluid=True, className="px-4 py-3")
     ], style={"backgroundColor": "#f8f9fa"})
 
-    # Add this new component to your layout
+    #Update data every 20 minutes
     app.layout.children[0].children.append(dcc.Interval(
         id='interval-component',
         interval=20*60*1000,  # in milliseconds, 20 minutes
@@ -64,7 +64,8 @@ def create_dashboard(sat_data_dir):
          Input("btn-rainfall", "n_clicks"),
          Input("btn-co2", "n_clicks"),
          Input("btn-satellite", "n_clicks"),
-         Input("interval-component", "n_intervals")]
+         Input("interval-component", "n_intervals")],
+         prevent_initial_call=False
     )
     def update_graph(*args):
         ctx = dash.callback_context
