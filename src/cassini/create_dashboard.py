@@ -11,7 +11,7 @@ import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from src.cassini.get_iot_data import get_time_series as iot_time_series
+from src.cassini.get_IOT_data import get_time_series as iot_time_series
 from src.cassini.open_tif import get_time_series as sat_time_series
 
 
