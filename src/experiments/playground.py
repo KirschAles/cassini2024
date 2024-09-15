@@ -51,3 +51,58 @@ response = requests.post('https://creodias.sentinel-hub.com/api/v1/process',
 })
 
 print(response.url)
+
+
+import matplotlib.pyplot as plt
+import matplotlib.dates as md
+import datetime
+
+from src.cassini.get_IOT_data import get_IOT_data as iot_time_series
+
+
+def visualize_IOT_data():
+    time_coarse, time_fine, temperature, humidity, pressure, rainfall = iot_time_series()
+
+    dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
+    dates_fine = md.date2num(dates_fine)
+    dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
+    dates_coarse = md.date2num(dates_coarse)
+
+    plt.figure(figsize=(12, 6))
+    plt.subplot(2, 2, 1)
+    plt.xticks( rotation=25 )
+    ax=plt.gca()
+    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+    ax.xaxis.set_major_formatter(xfmt)
+    plt.plot(dates_coarse, temperature, label='Temperature')
+    plt.ylabel("Temperature [°C]")
+    plt.xlabel("Time")
+    plt.title("Temperature")
+    plt.subplot(2, 2, 2)
+    plt.xticks( rotation=25 )
+    ax=plt.gca()
+    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+    ax.xaxis.set_major_formatter(xfmt)
+    plt.plot(dates_fine, humidity, label='Humidity')
+    plt.title("Humidity")
+    plt.subplot(2, 2, 3)
+    plt.xticks( rotation=25 )
+    ax=plt.gca()
+    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+    ax.xaxis.set_major_formatter(xfmt)
+    plt.plot(dates_fine, pressure, label='Pressure')
+    plt.ylabel("Pressure [hPa]")
+    plt.xlabel("Time")
+    plt.title("Pressure")
+    plt.subplot(2, 2, 4)
+    plt.xticks( rotation=25 )
+    ax=plt.gca()
+    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
+    ax.xaxis.set_major_formatter(xfmt)
+    plt.plot(dates_fine, rainfall, label='Rainfall')
+    plt.ylabel("Rainfall [mm]")
+    plt.xlabel("Time")
+    plt.title("Rainfall")
+    plt.tight_layout()
+
+    plt.show()

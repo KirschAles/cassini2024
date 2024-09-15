@@ -13,10 +13,11 @@ def open_with_rasterio(file_path):
 
     return arr[0][1,1]
 
-def get_time_series(folder):
+def get_time_series(folder: str, band: str):
     t = []
-    co_val = []
-    for dir in sorted(os.listdir(folder)):
+    val = []
+    subdirs_band = [subdir for subdir in os.listdir(folder) if subdir.split("_")[2] == band]
+    for dir in sorted(subdirs_band):
         date = dir.split("_")[1]
         if t:
             current = t[-1]
@@ -24,15 +25,15 @@ def get_time_series(folder):
                 current = datetime.strptime(current, "%Y-%m-%d-%H-%M") + timedelta(hours=1)
                 current = current.strftime("%Y-%m-%d-%H-%M")
                 t.append(current)
-                co_val.append(co_val[-1])
+                val.append(val[-1])
         t.append(date)
 
         for file in os.listdir(os.path.join(folder, dir)):
             if file.endswith(".tif"):
                 file_path = os.path.join(folder, dir, file)
                 co_center = open_with_rasterio(file_path)
-                co_val.append(co_center)
-    return t, co_val
+                val.append(co_center)
+    return t, val
 
 def plot_time_series(t, val):
     plt.figure(figsize=(12, 6))
@@ -49,5 +50,6 @@ def plot_time_series(t, val):
 
 if __name__ == "__main__":
     folder = "output"
-    t, co_val = get_time_series(folder)
+    band = "CO"
+    t, co_val = get_time_series(folder, band)
     plot_time_series(t, co_val)
