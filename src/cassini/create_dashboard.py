@@ -13,10 +13,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.cassini.get_IOT_data import get_time_series as iot_time_series
-from src.cassini.open_tif import get_time_series as sat_time_series
+from src.cassini.get_sat_data import get_time_series as sat_time_series
+from src.cassini.get_sat_data import update_sat_data
+
 
 
 SAT_DATA_DIR = "satellite_data"
+BANDS = ["CO", "NO2", "O3", "SO2"]
+POSITIONS = [(50.087,  14.424)]
 
 
 def create_dashboard(sat_data_dir):
@@ -32,7 +36,10 @@ def create_dashboard(sat_data_dir):
                 dbc.Col(dbc.Button("Pressure", id="btn-pressure", color="secondary", className="m-1"), width="auto"),
                 dbc.Col(dbc.Button("Rainfall", id="btn-rainfall", color="secondary", className="m-1"), width="auto"),
                 dbc.Col(dbc.Button("CO2 Level", id="btn-co2", color="secondary", className="m-1"), width="auto"),
-                dbc.Col(dbc.Button("CO Level (Satellite)", id="btn-satellite", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("CO Level (Satellite)", id="btn-co", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("NO2 Level (Satellite)", id="btn-no2", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("O3 Level (Satellite)", id="btn-o3", color="secondary", className="m-1"), width="auto"),
+                dbc.Col(dbc.Button("SO2 Level (Satellite)", id="btn-SO2", color="secondary", className="m-1"), width="auto"),
             ], className="mb-4"),
             dcc.Graph(id="graph-content", style={"height": "80vh"})
         ], fluid=True, className="px-4 py-3")
@@ -44,17 +51,41 @@ def create_dashboard(sat_data_dir):
         interval=20*60*1000,  # in milliseconds, 20 minutes
         n_intervals=0
     ))
+    # update sat data every 24 hours
+    app.layout.children[0].children.append(dcc.Interval(
+        id='sat-interval-component',
+        interval=24*60*60*1000,  # in milliseconds, 24 hours
+        n_intervals=0
+    ))
 
-    def get_updated_data():
+    def _get_updated_data():
         time_coarse, time_fine, time_co2, temperature, humidity, pressure, rainfall, co2 = iot_time_series()
-        t, co_val = sat_time_series(sat_data_dir)
+
+        sat_dates = []
+        sat_vals = []
+        for band in BANDS:
+            t, val = sat_time_series(sat_data_dir, band)
+            dates = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
+            sat_dates.append(dates)
+            sat_vals.append(val)
         
         dates_fine = [datetime.datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Prague")) for ts in time_fine]
         dates_coarse = [datetime.datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Prague")) for ts in time_coarse]
         dates_co2 = [datetime.datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Prague")) for ts in time_co2]
-        dates_sat = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
+
+        output = {"station_out": {"Temperature": (temperature, dates_coarse),
+                                  "Humidity": (humidity, dates_fine),
+                                  "Pressure": (pressure, dates_fine),
+                                  "Rainfall": (rainfall, dates_fine),},
+                 "station_in": {"CO2": (co2, dates_co2)},
+                 "satellite": {band: (val, t) for band, val, t in zip(BANDS, sat_vals, sat_dates)}}
         
-        return dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val
+        return output
+    
+    def _update_sat_data():
+        for pos in POSITIONS:
+            for band in BANDS:
+                update_sat_data(pos, band)
 
     @app.callback(
         [Output("graph-content", "figure"),
@@ -64,15 +95,22 @@ def create_dashboard(sat_data_dir):
          Output("btn-pressure", "color"),
          Output("btn-rainfall", "color"),
          Output("btn-co2", "color"),
-         Output("btn-satellite", "color")],
+         Output("btn-co", "color"),
+         Output("btn-no2", "color"),
+         Output("btn-o3", "color"),
+         Output("btn-SO2", "color")],
         [Input("btn-overview", "n_clicks"),
          Input("btn-temperature", "n_clicks"),
          Input("btn-humidity", "n_clicks"),
          Input("btn-pressure", "n_clicks"),
          Input("btn-rainfall", "n_clicks"),
          Input("btn-co2", "n_clicks"),
-         Input("btn-satellite", "n_clicks"),
-         Input("interval-component", "n_intervals")],
+         Input("btn-co", "n_clicks"),
+         Input("btn-no2", "n_clicks"),
+         Input("btn-o3", "n_clicks"),
+         Input("btn-SO2", "n_clicks"),
+         Input("interval-component", "n_intervals"),
+         Input("sat-interval-component", "n_intervals")],
          prevent_initial_call=False
     )
     def update_graph(*args):
@@ -83,101 +121,100 @@ def create_dashboard(sat_data_dir):
             button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         # Get updated data
-        dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val = get_updated_data()
+        data_dict = _get_updated_data()
+
+        subplot_titles = list(data_dict["station_out"].keys()) + list(data_dict["station_in"].keys()) + [key + " (Satellite)" for key in data_dict["satellite"].keys()]
 
         if button_id == "btn-overview":
-            fig = make_subplots(rows=3, cols=2, subplot_titles=("Temperature", "Humidity", "Pressure", "Rainfall", "CO2 Level", "CO Level (Satellite)"))
-            fig.add_trace(go.Scatter(x=dates_coarse, y=temperature, name="Temperature"), row=1, col=1)
-            fig.add_trace(go.Scatter(x=dates_fine, y=humidity, name="Humidity"), row=1, col=2)
-            fig.add_trace(go.Scatter(x=dates_fine, y=pressure, name="Pressure"), row=2, col=1)
-            fig.add_trace(go.Scatter(x=dates_fine, y=rainfall, name="Rainfall"), row=2, col=2)
-            fig.add_trace(go.Scatter(x=dates_co2, y=co2, name="CO2 Level"), row=3, col=1)
-            fig.add_trace(go.Scatter(x=dates_sat, y=co_val, name="CO Level (Satellite)"), row=3, col=2)
+            fig = make_subplots(rows=3, cols=3, subplot_titles=subplot_titles)
+            plot_pos = (1,1)
+            for i, key in enumerate(data_dict["station_out"].keys()):
+                fig.add_trace(go.Scatter(x=data_dict["station_out"][key][1], y=data_dict["station_out"][key][0], name=key), row=plot_pos[0], col=plot_pos[1])
+                if plot_pos[1] == 3:
+                    plot_pos = (plot_pos[0]+1, 1)
+                else:
+                    plot_pos = (plot_pos[0], plot_pos[1]+1)
+            for i, key in enumerate(data_dict["station_in"].keys()):
+                fig.add_trace(go.Scatter(x=data_dict["station_in"][key][1], y=data_dict["station_in"][key][0], name=key), row=plot_pos[0], col=plot_pos[1])
+                if plot_pos[1] == 3:
+                    plot_pos = (plot_pos[0]+1, 1)
+                else:
+                    plot_pos = (plot_pos[0], plot_pos[1]+1)
+            for i, key in enumerate(data_dict["satellite"].keys()):
+                fig.add_trace(go.Scatter(x=data_dict["satellite"][key][1], y=data_dict["satellite"][key][0], name=key + " (Satellite)"), row=plot_pos[0], col=plot_pos[1])
+                if plot_pos[1] == 3:
+                    plot_pos = (plot_pos[0]+1, 1)
+                else:
+                    plot_pos = (plot_pos[0], plot_pos[1]+1)
+
             fig.update_xaxes(title_text="Time", row=3, col=1)
             fig.update_xaxes(title_text="Time", row=3, col=2)
+            fig.update_xaxes(title_text="Time", row=3, col=3)
             fig.update_yaxes(title_text="Temperature [°C]", row=1, col=1)
             fig.update_yaxes(title_text="Humidity [%]", row=1, col=2)
-            fig.update_yaxes(title_text="Pressure [hPa]", row=2, col=1)
-            fig.update_yaxes(title_text="Rainfall [mm]", row=2, col=2)
-            fig.update_yaxes(title_text="CO2 Level [ppm]", row=3, col=1)
-            fig.update_yaxes(title_text="CO Level", row=3, col=2)
+            fig.update_yaxes(title_text="Pressure [hPa]", row=1, col=3)
+            fig.update_yaxes(title_text="Rainfall [mm]", row=2, col=1)
+            fig.update_yaxes(title_text="CO2 Level [ppm]", row=2, col=2)
+            fig.update_yaxes(title_text="CO Level", row=2, col=3)
+            fig.update_yaxes(title_text="NO2 Level", row=3, col=1)
+            fig.update_yaxes(title_text="O3 Level", row=3, col=2)
+            fig.update_yaxes(title_text="SO2 Level", row=3, col=3)
         elif button_id == "btn-temperature":
-            fig = go.Figure(go.Scatter(x=dates_coarse, y=temperature, name="Temperature"))
+            t = data_dict["station_out"]["Temperature"][1]
+            val = data_dict["station_out"]["Temperature"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="Temperature"))
             fig.update_layout(title="Temperature", xaxis_title="Time", yaxis_title="Temperature [°C]")
         elif button_id == "btn-humidity":
-            fig = go.Figure(go.Scatter(x=dates_fine, y=humidity, name="Humidity"))
+            t = data_dict["station_out"]["Humidity"][1]
+            val = data_dict["station_out"]["Humidity"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="Humidity"))
             fig.update_layout(title="Humidity", xaxis_title="Time", yaxis_title="Humidity [%]")
         elif button_id == "btn-pressure":
-            fig = go.Figure(go.Scatter(x=dates_fine, y=pressure, name="Pressure"))
+            t = data_dict["station_out"]["Pressure"][1]
+            val = data_dict["station_out"]["Pressure"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="Pressure"))
             fig.update_layout(title="Pressure", xaxis_title="Time", yaxis_title="Pressure [hPa]")
         elif button_id == "btn-rainfall":
-            fig = go.Figure(go.Scatter(x=dates_fine, y=rainfall, name="Rainfall"))
+            t = data_dict["station_out"]["Rainfall"][1]
+            val = data_dict["station_out"]["Rainfall"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="Rainfall"))
             fig.update_layout(title="Rainfall", xaxis_title="Time", yaxis_title="Rainfall [mm]")
         elif button_id == "btn-co2":
-            fig = go.Figure(go.Scatter(x=dates_co2, y=co2, name="CO2 Level"))
+            t = data_dict["station_in"]["CO2"][1]
+            val = data_dict["station_in"]["CO2"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="CO2 Level"))
             fig.update_layout(title="CO2 Level", xaxis_title="Time", yaxis_title="CO2 Level [ppm]")
-        elif button_id == "btn-satellite":
-            fig = go.Figure(go.Scatter(x=dates_sat, y=co_val, name="CO Level (Satellite)"))
-            fig.update_layout(title="Satellite Data", xaxis_title="Time", yaxis_title="CO Level")
+        elif button_id == "btn-co":
+            t = data_dict["satellite"]["CO"][1]
+            val = data_dict["satellite"]["CO"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="CO Level (Satellite)"))
+            fig.update_layout(title="CO Level (Satellite)", xaxis_title="Time", yaxis_title="CO Level")
+        elif button_id == "btn-no2":
+            t = data_dict["satellite"]["NO2"][1]
+            val = data_dict["satellite"]["NO2"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="NO2 Level (Satellite)"))
+            fig.update_layout(title="NO2 Level (Satellite)", xaxis_title="Time", yaxis_title="NO2 Level")
+        elif button_id == "btn-o3":
+            t = data_dict["satellite"]["O3"][1]
+            val = data_dict["satellite"]["O3"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="O3 Level (Satellite)"))
+            fig.update_layout(title="O3 Level (Satellite)", xaxis_title="Time", yaxis_title="O3 Level")
+        elif button_id == "btn-SO2":
+            t = data_dict["satellite"]["SO2"][1]
+            val = data_dict["satellite"]["SO2"][0]
+            fig = go.Figure(go.Scatter(x=t, y=val, name="SO2 Level (Satellite)"))
+            fig.update_layout(title="SO2 Level (Satellite)", xaxis_title="Time", yaxis_title="SO2 Level")
 
         fig.update_layout(height=700)
 
         # Update button colors
-        button_colors = ["secondary"] * 7
-        button_index = ["btn-overview", "btn-temperature", "btn-humidity", "btn-pressure", "btn-rainfall", "btn-co2", "btn-satellite"].index(button_id)
+        button_colors = ["secondary"] * 10
+        button_index = ["btn-overview", "btn-temperature", "btn-humidity", "btn-pressure", "btn-rainfall", "btn-co2", "btn-co", "btn-no2", "btn-o3", "btn-SO2"].index(button_id)
         button_colors[button_index] = "primary"
 
         return fig, *button_colors
 
     return app
-
-
-def visualize_IOT_data():
-    time_coarse, time_fine, temperature, humidity, pressure, rainfall = iot_time_series()
-
-    dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
-    dates_fine = md.date2num(dates_fine)
-    dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
-    dates_coarse = md.date2num(dates_coarse)
-
-    plt.figure(figsize=(12, 6))
-    plt.subplot(2, 2, 1)
-    plt.xticks( rotation=25 )
-    ax=plt.gca()
-    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-    ax.xaxis.set_major_formatter(xfmt)
-    plt.plot(dates_coarse, temperature, label='Temperature')
-    plt.ylabel("Temperature [°C]")
-    plt.xlabel("Time")
-    plt.title("Temperature")
-    plt.subplot(2, 2, 2)
-    plt.xticks( rotation=25 )
-    ax=plt.gca()
-    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-    ax.xaxis.set_major_formatter(xfmt)
-    plt.plot(dates_fine, humidity, label='Humidity')
-    plt.title("Humidity")
-    plt.subplot(2, 2, 3)
-    plt.xticks( rotation=25 )
-    ax=plt.gca()
-    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-    ax.xaxis.set_major_formatter(xfmt)
-    plt.plot(dates_fine, pressure, label='Pressure')
-    plt.ylabel("Pressure [hPa]")
-    plt.xlabel("Time")
-    plt.title("Pressure")
-    plt.subplot(2, 2, 4)
-    plt.xticks( rotation=25 )
-    ax=plt.gca()
-    xfmt = md.DateFormatter('%Y-%m-%d %H:%M:%S')
-    ax.xaxis.set_major_formatter(xfmt)
-    plt.plot(dates_fine, rainfall, label='Rainfall')
-    plt.ylabel("Rainfall [mm]")
-    plt.xlabel("Time")
-    plt.title("Rainfall")
-    plt.tight_layout()
-
-    plt.show()
 
 
 

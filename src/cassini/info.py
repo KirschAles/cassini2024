@@ -68,6 +68,8 @@ def get_new_updates(latitude: float,
     items = [x for x in items if not_too_long(x)]
     items = [x for x in items if contains_bbox(box, x['geometry']['coordinates'][0])]
     datetimes = pd.DataFrame(data={'datetime': [datetime.datetime.fromisoformat(x['properties']['datetime'][:19]) for x in items]})
+    if len(datetimes) == 0:
+        return []
     datetimes['date'] = datetimes['datetime'].dt.date
     return list(datetimes.groupby(by=['date']).mean()['datetime'])
 
