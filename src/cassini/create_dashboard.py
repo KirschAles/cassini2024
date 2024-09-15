@@ -166,7 +166,7 @@ def visualize_IOT_data():
 
 
 
-
-app = create_dashboard(SAT_DATA_DIR)
-server = app.server
+if __name__ == "__main__":
+    app = create_dashboard(SAT_DATA_DIR)
+    server = app.server
 app.run_server(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
