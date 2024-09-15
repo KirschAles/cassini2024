@@ -48,9 +48,9 @@ def create_dashboard(sat_data_dir):
         time_coarse, time_fine, time_co2, temperature, humidity, pressure, rainfall, co2 = iot_time_series()
         t, co_val = sat_time_series(sat_data_dir)
         
-        dates_fine = [datetime.datetime.fromtimestamp(ts) for ts in time_fine]
-        dates_coarse = [datetime.datetime.fromtimestamp(ts) for ts in time_coarse]
-        dates_co2 = [datetime.datetime.fromtimestamp(ts) for ts in time_co2]
+        dates_fine = [datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc) for ts in time_fine]
+        dates_coarse = [datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc) for ts in time_coarse]
+        dates_co2 = [datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc) for ts in time_co2]
         dates_sat = [datetime.datetime.strptime(ts, '%Y-%m-%d-%H-%M') for ts in t]
         
         return dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val
