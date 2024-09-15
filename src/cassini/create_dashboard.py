@@ -57,7 +57,14 @@ def create_dashboard(sat_data_dir):
         return dates_fine, dates_coarse, dates_co2, dates_sat, temperature, humidity, pressure, rainfall, co2, co_val
 
     @app.callback(
-        Output("graph-content", "figure"),
+        [Output("graph-content", "figure"),
+         Output("btn-overview", "color"),
+         Output("btn-temperature", "color"),
+         Output("btn-humidity", "color"),
+         Output("btn-pressure", "color"),
+         Output("btn-rainfall", "color"),
+         Output("btn-co2", "color"),
+         Output("btn-satellite", "color")],
         [Input("btn-overview", "n_clicks"),
          Input("btn-temperature", "n_clicks"),
          Input("btn-humidity", "n_clicks"),
@@ -114,7 +121,13 @@ def create_dashboard(sat_data_dir):
             fig.update_layout(title="Satellite Data", xaxis_title="Time", yaxis_title="CO Level")
 
         fig.update_layout(height=700)
-        return fig
+
+        # Update button colors
+        button_colors = ["secondary"] * 7
+        button_index = ["btn-overview", "btn-temperature", "btn-humidity", "btn-pressure", "btn-rainfall", "btn-co2", "btn-satellite"].index(button_id)
+        button_colors[button_index] = "primary"
+
+        return fig, *button_colors
 
     return app
 
