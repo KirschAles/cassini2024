@@ -35,8 +35,8 @@ def get_time_series():
     co2 = []
 
     for t, d in enumerate(data):
-        dtime_coarse = datetime.datetime.fromisoformat(d['created_at'][:19])
-        tstamp_coarse = datetime.datetime.timestamp(dtime_coarse)
+        # dtime_coarse = datetime.datetime.fromisoformat(d['created_at'][:19])
+        # tstamp_coarse = datetime.datetime.timestamp(dtime_coarse)
         if d['type'] == 'data' and d['device_name'] == 'chester-meteo':
             try:
                 dict_data = ast.literal_eval(d['body'])
@@ -47,7 +47,9 @@ def get_time_series():
                 print(e)
                 continue
 
-            time_coarse.append(tstamp_coarse)
+            # time_coarse.append(tstamp_coarse)
+            # print(dict_data['message'])
+            time_coarse.append(dict_data['message']['timestamp'])
             temperature.append(dict_data['thermometer']['temperature'])
 
             num_measutements = len(dict_data['hygrometer']['humidity']['measurements'])
@@ -82,12 +84,20 @@ def get_time_series():
     sorted_rainfall = [r for _, r in sorted(zip(time_fine, rainfall))]
     sorted_pressure = [p for _, p in sorted(zip(time_fine, pressure))]
     sorted_humidity = [h for _, h in sorted(zip(time_fine, humidity))]
+    sorted_temperature = [t for _, t in sorted(zip(time_coarse, temperature))]
+    sorted_time_coarse = sorted(time_coarse)
     sorted_time_fine = sorted(time_fine)
     sorted_co2 = [c for _, c in sorted(zip(time_co2, co2))]
     sorted_time_co2 = sorted(time_co2)
 
-    return time_coarse, sorted_time_fine, sorted_time_co2, temperature, sorted_humidity, sorted_pressure, sorted_rainfall, sorted_co2
+    return sorted_time_coarse, sorted_time_fine, sorted_time_co2, sorted_temperature, sorted_humidity, sorted_pressure, sorted_rainfall, sorted_co2
 
 
 if __name__ == "__main__":
     time_coarse, time_fine, time_co2, temperature, humidity, pressure, rainfall, co2 = get_time_series()
+
+    date_time_coarse = [datetime.datetime.fromtimestamp(t) for t in time_coarse][-1]
+    date_time_fine = [datetime.datetime.fromtimestamp(t) for t in time_fine][-1]
+
+    print(date_time_coarse)
+    print(date_time_fine)
