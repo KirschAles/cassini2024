@@ -15,7 +15,7 @@ from src.cassini.get_IOT_data import get_time_series as iot_time_series
 from src.cassini.open_tif import get_time_series as sat_time_series
 
 
-SAT_DATA_DIR = "output"
+SAT_DATA_DIR = "satellite_data"
 
 
 def create_dashboard(sat_data_dir):
